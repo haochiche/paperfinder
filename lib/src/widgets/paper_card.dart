@@ -17,7 +17,67 @@ class PaperCard extends StatefulWidget {
 }
 
 class _PaperCardState extends State<PaperCard> {
-  bool _expanded = false;
+  void _openAbstractReader(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      builder: (context) {
+        return FractionallySizedBox(
+          heightFactor: 0.92,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 52,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  widget.paper.title,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  widget.paper.authors.isEmpty ? 'Unknown authors' : widget.paper.authors.join(', '),
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  widget.paper.hasAbstract
+                      ? 'Abstract source: ${widget.paper.abstractSource}'
+                      : 'No abstract source found',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+                const SizedBox(height: 18),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Text(
+                      widget.paper.abstract.isEmpty
+                          ? 'OpenAlex and Crossref do not provide an abstract for this work.'
+                          : widget.paper.abstract,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.65),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -71,26 +131,26 @@ class _PaperCardState extends State<PaperCard> {
                   borderRadius: BorderRadius.circular(18),
                 ),
                 child: SingleChildScrollView(
-                  physics: _expanded
-                      ? const BouncingScrollPhysics()
-                      : const NeverScrollableScrollPhysics(),
+                  physics: const NeverScrollableScrollPhysics(),
                   child: Text(
-                    paper.abstract.isEmpty ? 'No abstract available for this record.' : paper.abstract,
-                    maxLines: _expanded ? null : 8,
-                    overflow: _expanded ? TextOverflow.visible : TextOverflow.fade,
+                    paper.abstract.isEmpty
+                        ? 'OpenAlex and Crossref do not provide an abstract for this work.'
+                        : paper.abstract,
+                    maxLines: 8,
+                    overflow: TextOverflow.fade,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.5),
                   ),
                 ),
               ),
             ),
-            if (paper.hasLongAbstract && !widget.isPreview) ...[
+            if (!widget.isPreview) ...[
               const SizedBox(height: 10),
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(
-                  onPressed: () => setState(() => _expanded = !_expanded),
-                  icon: Icon(_expanded ? Icons.expand_less : Icons.expand_more),
-                  label: Text(_expanded ? 'Collapse abstract' : 'Expand abstract'),
+                  onPressed: () => _openAbstractReader(context),
+                  icon: const Icon(Icons.open_in_full),
+                  label: Text(paper.abstract.isEmpty ? 'Details' : 'Read full abstract'),
                 ),
               ),
             ],

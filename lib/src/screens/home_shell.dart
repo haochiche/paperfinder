@@ -68,7 +68,7 @@ class HomeShell extends StatelessWidget {
         onDestinationSelected: controller.setTabIndex,
         destinations: const [
           NavigationDestination(icon: Icon(Icons.search), label: 'Search'),
-          NavigationDestination(icon: Icon(Icons.style), label: 'Discover'),
+          NavigationDestination(icon: Icon(Icons.style), label: 'Results'),
           NavigationDestination(icon: Icon(Icons.bookmark), label: 'Saved'),
           NavigationDestination(icon: Icon(Icons.settings), label: 'Settings'),
         ],
@@ -76,4 +76,3 @@ class HomeShell extends StatelessWidget {
     );
   }
 }
-

@@ -23,6 +23,7 @@ class AppController extends ChangeNotifier {
   bool isSearching = false;
   bool isSavingPaper = false;
   bool isLoadingCollections = false;
+  bool showResultsList = true;
   String? errorMessage;
 
   SearchRequest lastSearch = const SearchRequest(keywords: '', pageSize: 20);
@@ -93,6 +94,7 @@ class AppController extends ChangeNotifier {
       ].take(8).toList();
       await _localStore.saveSearchHistory(searchHistory);
       selectedTabIndex = 1;
+      showResultsList = true;
     } catch (error) {
       errorMessage = error.toString();
     } finally {
@@ -128,6 +130,25 @@ class AppController extends ChangeNotifier {
 
   Future<List<SourceRef>> lookupSources(String query) async {
     return _openAlexRepository.autocompleteSources(query);
+  }
+
+  void openPaperDeck(String paperId) {
+    final selectedIndex = discoveryQueue.indexWhere((paper) => paper.openAlexId == paperId);
+    if (selectedIndex == -1) {
+      return;
+    }
+
+    discoveryQueue = [
+      ...discoveryQueue.skip(selectedIndex),
+      ...discoveryQueue.take(selectedIndex),
+    ];
+    showResultsList = false;
+    notifyListeners();
+  }
+
+  void showBrowseList() {
+    showResultsList = true;
+    notifyListeners();
   }
 
   Future<void> skipTopPaper() async {
@@ -185,7 +206,9 @@ class AppController extends ChangeNotifier {
     await _localStore.saveSavedPapers(savedPapers);
     if (removeFromQueue) {
       discoveryQueue = discoveryQueue.skip(1).toList();
-      selectedTabIndex = 1;
+      if (discoveryQueue.isEmpty) {
+        showResultsList = true;
+      }
     }
     isSavingPaper = false;
     notifyListeners();
@@ -231,4 +254,3 @@ class AppController extends ChangeNotifier {
     }
   }
 }
-

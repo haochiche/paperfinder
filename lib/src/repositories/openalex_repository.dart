@@ -48,10 +48,11 @@ class OpenAlexRepository {
         .map((item) => _paperFromOpenAlex(Map<String, dynamic>.from(item as Map)))
         .where((paper) => paper.title.isNotEmpty)
         .toList();
+    final enrichedResults = await _hydrateMissingAbstracts(results);
 
     final meta = Map<String, dynamic>.from(payload['meta'] as Map? ?? {});
     return SearchResponse(
-      papers: results,
+      papers: enrichedResults,
       nextCursor: meta['next_cursor'] as String?,
     );
   }
@@ -108,7 +109,67 @@ class OpenAlexRepository {
       doi: _normalizeDoi(json['doi'] as String? ?? ids['doi'] as String?),
       landingPageUrl: primaryLocation['landing_page_url'] as String?,
       citationCount: json['cited_by_count'] as int?,
+      abstractSource: 'OpenAlex',
     );
+  }
+
+  Future<List<PaperSummary>> _hydrateMissingAbstracts(List<PaperSummary> papers) async {
+    final hydrated = List<PaperSummary>.from(papers);
+    final missingIndexes = <int>[
+      for (var i = 0; i < hydrated.length; i++)
+        if (!hydrated[i].hasAbstract && hydrated[i].doi != null && hydrated[i].doi!.isNotEmpty) i,
+    ].take(8).toList();
+
+    await Future.wait(
+      missingIndexes.map((index) async {
+        final recoveredAbstract = await _fetchCrossrefAbstract(hydrated[index].doi!);
+        if (recoveredAbstract != null && recoveredAbstract.isNotEmpty) {
+          hydrated[index] = hydrated[index].copyWith(
+            abstract: recoveredAbstract,
+            abstractSource: 'Crossref',
+          );
+        }
+      }),
+    );
+
+    return hydrated;
+  }
+
+  Future<String?> _fetchCrossrefAbstract(String doi) async {
+    try {
+      final uri = Uri.https('api.crossref.org', '/works/${Uri.encodeComponent(doi)}');
+      final response = await _client.get(
+        uri,
+        headers: const {
+          'User-Agent': 'paperfinder/0.1',
+        },
+      );
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return null;
+      }
+
+      final payload = jsonDecode(response.body) as Map<String, dynamic>;
+      final message = Map<String, dynamic>.from(payload['message'] as Map? ?? {});
+      final rawAbstract = message['abstract'] as String?;
+      if (rawAbstract == null || rawAbstract.isEmpty) {
+        return null;
+      }
+      return _cleanCrossrefAbstract(rawAbstract);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static String _cleanCrossrefAbstract(String rawAbstract) {
+    final withoutTags = rawAbstract.replaceAll(RegExp(r'<[^>]+>'), ' ');
+    return withoutTags
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&#39;', "'")
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
   }
 
   static String decodeAbstractInvertedIndex(Map<String, dynamic> index) {
@@ -144,4 +205,3 @@ class OpenAlexException implements Exception {
   @override
   String toString() => message;
 }
-

@@ -109,6 +109,7 @@ class PaperSummary {
     this.doi,
     this.landingPageUrl,
     this.citationCount,
+    this.abstractSource = 'OpenAlex',
   });
 
   final String openAlexId;
@@ -120,8 +121,36 @@ class PaperSummary {
   final String? doi;
   final String? landingPageUrl;
   final int? citationCount;
+  final String abstractSource;
 
   bool get hasLongAbstract => abstract.length > 420;
+  bool get hasAbstract => abstract.trim().isNotEmpty;
+
+  PaperSummary copyWith({
+    String? openAlexId,
+    String? title,
+    String? abstract,
+    List<String>? authors,
+    int? year,
+    String? journal,
+    String? doi,
+    String? landingPageUrl,
+    int? citationCount,
+    String? abstractSource,
+  }) {
+    return PaperSummary(
+      openAlexId: openAlexId ?? this.openAlexId,
+      title: title ?? this.title,
+      abstract: abstract ?? this.abstract,
+      authors: authors ?? this.authors,
+      year: year ?? this.year,
+      journal: journal ?? this.journal,
+      doi: doi ?? this.doi,
+      landingPageUrl: landingPageUrl ?? this.landingPageUrl,
+      citationCount: citationCount ?? this.citationCount,
+      abstractSource: abstractSource ?? this.abstractSource,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
         'openAlexId': openAlexId,
@@ -133,6 +162,7 @@ class PaperSummary {
         'doi': doi,
         'landingPageUrl': landingPageUrl,
         'citationCount': citationCount,
+        'abstractSource': abstractSource,
       };
 
   factory PaperSummary.fromJson(Map<String, dynamic> json) => PaperSummary(
@@ -145,6 +175,7 @@ class PaperSummary {
         doi: json['doi'] as String?,
         landingPageUrl: json['landingPageUrl'] as String?,
         citationCount: json['citationCount'] as int?,
+        abstractSource: json['abstractSource'] as String? ?? 'OpenAlex',
       );
 }
 
@@ -296,4 +327,3 @@ class SearchResponse {
 }
 
 String encodeJsonList(List<Map<String, dynamic>> data) => jsonEncode(data);
-
