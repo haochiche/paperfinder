@@ -85,7 +85,9 @@ class AppController extends ChangeNotifier {
     try {
       final response = await _openAlexRepository.searchWorks(request.copyWith(clearCursor: true));
       final excludedIds = {
-        ...savedPapers.map((record) => record.paper.openAlexId),
+        ...savedPapers
+            .where((record) => record.status == SaveSyncStatus.synced)
+            .map((record) => record.paper.openAlexId),
         ...skippedPaperIds,
       };
       discoveryQueue = response.papers.where((paper) => !excludedIds.contains(paper.openAlexId)).toList();
@@ -119,7 +121,9 @@ class AppController extends ChangeNotifier {
       final response = await _openAlexRepository.searchWorks(lastSearch.copyWith(pageCursor: nextCursor));
       final knownIds = {
         ...discoveryQueue.map((paper) => paper.openAlexId),
-        ...savedPapers.map((record) => record.paper.openAlexId),
+        ...savedPapers
+            .where((record) => record.status == SaveSyncStatus.synced)
+            .map((record) => record.paper.openAlexId),
         ...skippedPaperIds,
       };
       final newItems = response.papers.where((paper) => !knownIds.contains(paper.openAlexId));
@@ -175,12 +179,19 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> savePaper(PaperSummary paper, {bool removeFromQueue = false}) async {
-    if (savedPapers.any((record) => record.paper.openAlexId == paper.openAlexId)) {
-      if (removeFromQueue) {
-        discoveryQueue = discoveryQueue.where((item) => item.openAlexId != paper.openAlexId).toList();
+    final existingRecord = savedPapers
+        .where((record) => record.paper.openAlexId == paper.openAlexId)
+        .cast<SavedPaperRecord?>()
+        .firstWhere((_) => true, orElse: () => null);
+    if (existingRecord != null) {
+      if (existingRecord.status == SaveSyncStatus.synced) {
+        if (removeFromQueue) {
+          discoveryQueue = discoveryQueue.where((item) => item.openAlexId != paper.openAlexId).toList();
+        }
+        notifyListeners();
+        return;
       }
-      notifyListeners();
-      return;
+      savedPapers = savedPapers.where((record) => record.paper.openAlexId != paper.openAlexId).toList();
     }
 
     isSavingPaper = true;
@@ -210,8 +221,10 @@ class AppController extends ChangeNotifier {
 
     savedPapers = [record, ...savedPapers];
     await _localStore.saveSavedPapers(savedPapers);
-    skippedPaperIds.add(paper.openAlexId);
-    await _localStore.saveSkippedPaperIds(skippedPaperIds);
+    if (record.status == SaveSyncStatus.synced) {
+      skippedPaperIds.add(paper.openAlexId);
+      await _localStore.saveSkippedPaperIds(skippedPaperIds);
+    }
     if (removeFromQueue) {
       discoveryQueue = discoveryQueue.skip(1).toList();
       if (discoveryQueue.isEmpty) {

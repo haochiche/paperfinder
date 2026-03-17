@@ -108,6 +108,8 @@ class PaperSummary {
     this.journal,
     this.doi,
     this.landingPageUrl,
+    this.semanticScholarUrl,
+    this.pdfUrl,
     this.citationCount,
     this.abstractSource = 'OpenAlex',
   });
@@ -120,11 +122,14 @@ class PaperSummary {
   final String? journal;
   final String? doi;
   final String? landingPageUrl;
+  final String? semanticScholarUrl;
+  final String? pdfUrl;
   final int? citationCount;
   final String abstractSource;
 
   bool get hasLongAbstract => abstract.length > 420;
   bool get hasAbstract => abstract.trim().isNotEmpty;
+  String? get preferredReadUrl => pdfUrl ?? landingPageUrl ?? semanticScholarUrl;
 
   PaperSummary copyWith({
     String? openAlexId,
@@ -135,6 +140,8 @@ class PaperSummary {
     String? journal,
     String? doi,
     String? landingPageUrl,
+    String? semanticScholarUrl,
+    String? pdfUrl,
     int? citationCount,
     String? abstractSource,
   }) {
@@ -147,6 +154,8 @@ class PaperSummary {
       journal: journal ?? this.journal,
       doi: doi ?? this.doi,
       landingPageUrl: landingPageUrl ?? this.landingPageUrl,
+      semanticScholarUrl: semanticScholarUrl ?? this.semanticScholarUrl,
+      pdfUrl: pdfUrl ?? this.pdfUrl,
       citationCount: citationCount ?? this.citationCount,
       abstractSource: abstractSource ?? this.abstractSource,
     );
@@ -161,6 +170,8 @@ class PaperSummary {
         'journal': journal,
         'doi': doi,
         'landingPageUrl': landingPageUrl,
+        'semanticScholarUrl': semanticScholarUrl,
+        'pdfUrl': pdfUrl,
         'citationCount': citationCount,
         'abstractSource': abstractSource,
       };
@@ -174,6 +185,8 @@ class PaperSummary {
         journal: json['journal'] as String?,
         doi: json['doi'] as String?,
         landingPageUrl: json['landingPageUrl'] as String?,
+        semanticScholarUrl: json['semanticScholarUrl'] as String?,
+        pdfUrl: json['pdfUrl'] as String?,
         citationCount: json['citationCount'] as int?,
         abstractSource: json['abstractSource'] as String? ?? 'OpenAlex',
       );

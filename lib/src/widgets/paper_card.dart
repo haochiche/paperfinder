@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/paper_models.dart';
 
@@ -74,6 +75,14 @@ class _PaperCardState extends State<PaperCard> {
     );
   }
 
+  Future<void> _openPaperLink(BuildContext context, String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      return;
+    }
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
   @override
   Widget build(BuildContext context) {
     final paper = widget.paper;
@@ -141,13 +150,28 @@ class _PaperCardState extends State<PaperCard> {
                   ),
                   if (!widget.isPreview) ...[
                     const SizedBox(height: 10),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton.icon(
-                        onPressed: () => _openAbstractReader(context),
-                        icon: const Icon(Icons.open_in_full),
-                        label: Text(paper.abstract.isEmpty ? 'Details' : 'Read full abstract'),
-                      ),
+                    Row(
+                      children: [
+                        if (paper.preferredReadUrl?.isNotEmpty == true)
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => _openPaperLink(context, paper.preferredReadUrl!),
+                              icon: const Icon(Icons.open_in_browser),
+                              label: Text(paper.pdfUrl?.isNotEmpty == true ? 'Open PDF' : 'Open paper'),
+                            ),
+                          ),
+                        if (paper.preferredReadUrl?.isNotEmpty == true) const SizedBox(width: 10),
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton.icon(
+                              onPressed: () => _openAbstractReader(context),
+                              icon: const Icon(Icons.open_in_full),
+                              label: Text(paper.abstract.isEmpty ? 'Details' : 'Read full abstract'),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                   if (paper.doi?.isNotEmpty == true && !widget.isPreview)

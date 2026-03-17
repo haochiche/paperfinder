@@ -117,20 +117,33 @@ class OpenAlexRepository {
     final hydrated = List<PaperSummary>.from(papers);
     final missingIndexes = <int>[
       for (var i = 0; i < hydrated.length; i++)
-        if (!hydrated[i].hasAbstract && hydrated[i].doi != null && hydrated[i].doi!.isNotEmpty) i,
-    ].take(8).toList();
+        if (!hydrated[i].hasAbstract) i,
+    ];
 
-    await Future.wait(
-      missingIndexes.map((index) async {
-        final recoveredAbstract = await _fetchCrossrefAbstract(hydrated[index].doi!);
-        if (recoveredAbstract != null && recoveredAbstract.isNotEmpty) {
-          hydrated[index] = hydrated[index].copyWith(
-            abstract: recoveredAbstract,
-            abstractSource: 'Crossref',
-          );
-        }
-      }),
-    );
+    const int batchSize = 8;
+    for (var start = 0; start < missingIndexes.length; start += batchSize) {
+      final batch = missingIndexes.skip(start).take(batchSize);
+      await Future.wait(
+        batch.map((index) async {
+          final doi = hydrated[index].doi;
+          if (doi != null && doi.isNotEmpty) {
+            final crossrefAbstract = await _fetchCrossrefAbstract(doi);
+            if (crossrefAbstract != null && crossrefAbstract.isNotEmpty) {
+              hydrated[index] = hydrated[index].copyWith(
+                abstract: crossrefAbstract,
+                abstractSource: 'Crossref',
+              );
+              return;
+            }
+          }
+
+          final semanticScholarPaper = await _fetchSemanticScholarPaper(hydrated[index]);
+          if (semanticScholarPaper != null) {
+            hydrated[index] = semanticScholarPaper;
+          }
+        }),
+      );
+    }
 
     return hydrated;
   }
@@ -155,6 +168,53 @@ class OpenAlexRepository {
         return null;
       }
       return _cleanCrossrefAbstract(rawAbstract);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<PaperSummary?> _fetchSemanticScholarPaper(PaperSummary paper) async {
+    try {
+      final identifier = paper.doi != null && paper.doi!.isNotEmpty
+          ? 'DOI:${paper.doi}'
+          : Uri.encodeComponent(paper.title);
+      final path = paper.doi != null && paper.doi!.isNotEmpty
+          ? '/graph/v1/paper/$identifier'
+          : '/graph/v1/paper/search/match';
+      final queryParameters = paper.doi != null && paper.doi!.isNotEmpty
+          ? {
+              'fields': 'abstract,url,openAccessPdf,title',
+            }
+          : {
+              'query': paper.title,
+              'fields': 'abstract,url,openAccessPdf,title',
+            };
+
+      final uri = Uri.https('api.semanticscholar.org', path, queryParameters);
+      final response = await _client.get(uri);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        return null;
+      }
+
+      final payload = jsonDecode(response.body) as Map<String, dynamic>;
+      final resolved = paper.doi != null && paper.doi!.isNotEmpty
+          ? payload
+          : Map<String, dynamic>.from(payload['data'] as Map? ?? {});
+      final recoveredAbstract = (resolved['abstract'] as String? ?? '').trim();
+      final semanticUrl = resolved['url'] as String?;
+      final openAccessPdf = Map<String, dynamic>.from(resolved['openAccessPdf'] as Map? ?? {});
+      final pdfUrl = openAccessPdf['url'] as String?;
+
+      if (recoveredAbstract.isEmpty && semanticUrl == null && pdfUrl == null) {
+        return null;
+      }
+
+      return paper.copyWith(
+        abstract: recoveredAbstract.isEmpty ? paper.abstract : recoveredAbstract,
+        abstractSource: recoveredAbstract.isEmpty ? paper.abstractSource : 'Semantic Scholar',
+        semanticScholarUrl: semanticUrl ?? paper.semanticScholarUrl,
+        pdfUrl: pdfUrl ?? paper.pdfUrl,
+      );
     } catch (_) {
       return null;
     }
