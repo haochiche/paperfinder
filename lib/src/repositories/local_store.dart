@@ -10,6 +10,7 @@ class LocalStore {
   static const String _searchHistoryKey = 'search_history';
   static const String _lastSearchKey = 'last_search';
   static const String _zoteroConfigKey = 'zotero_config';
+  static const String _skippedPaperIdsKey = 'skipped_paper_ids';
 
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
 
@@ -69,6 +70,16 @@ class LocalStore {
     await preferences.setString(_lastSearchKey, jsonEncode(request.toJson()));
   }
 
+  Future<Set<String>> loadSkippedPaperIds() async {
+    final preferences = await SharedPreferences.getInstance();
+    return (preferences.getStringList(_skippedPaperIdsKey) ?? const []).toSet();
+  }
+
+  Future<void> saveSkippedPaperIds(Set<String> paperIds) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setStringList(_skippedPaperIdsKey, paperIds.toList()..sort());
+  }
+
   Future<ZoteroConfig?> loadZoteroConfig() async {
     final raw = await _secureStorage.read(key: _zoteroConfigKey);
     if (raw == null || raw.isEmpty) {
@@ -81,4 +92,3 @@ class LocalStore {
     await _secureStorage.write(key: _zoteroConfigKey, value: jsonEncode(config.toJson()));
   }
 }
-

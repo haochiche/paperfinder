@@ -43,15 +43,10 @@ class _PaperCardState extends State<PaperCard> {
                 ),
                 const SizedBox(height: 18),
                 Text(
-                  widget.paper.title,
+                  'Abstract',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 10),
-                Text(
-                  widget.paper.authors.isEmpty ? 'Unknown authors' : widget.paper.authors.join(', '),
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 8),
                 Text(
                   widget.paper.hasAbstract
                       ? 'Abstract source: ${widget.paper.abstractSource}'
@@ -86,81 +81,85 @@ class _PaperCardState extends State<PaperCard> {
     return Card(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.all(22),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Text(
-                [
-                  if (paper.journal?.isNotEmpty == true) paper.journal!,
-                  if (paper.year != null) '${paper.year}',
-                  if (paper.citationCount != null) '${paper.citationCount} citations',
-                ].join(' • '),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              paper.title,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              paper.authors.isEmpty ? 'Unknown authors' : paper.authors.join(', '),
-              maxLines: widget.isPreview ? 2 : 3,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.4),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              'Abstract',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.66),
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: SingleChildScrollView(
-                  physics: const NeverScrollableScrollPhysics(),
-                  child: Text(
-                    paper.abstract.isEmpty
-                        ? 'OpenAlex and Crossref do not provide an abstract for this work.'
-                        : paper.abstract,
-                    maxLines: 8,
-                    overflow: TextOverflow.fade,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.5),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(22),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight - 44),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      [
+                        if (paper.journal?.isNotEmpty == true) paper.journal!,
+                        if (paper.year != null) '${paper.year}',
+                        if (paper.citationCount != null) '${paper.citationCount} citations',
+                      ].join(' • '),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 18),
+                  Text(
+                    paper.title,
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    paper.authors.isEmpty ? 'Unknown authors' : paper.authors.join(', '),
+                    maxLines: widget.isPreview ? 2 : null,
+                    overflow: widget.isPreview ? TextOverflow.ellipsis : TextOverflow.visible,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.4),
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    'Abstract',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    constraints: const BoxConstraints(minHeight: 120),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.66),
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Text(
+                      paper.abstract.isEmpty
+                          ? 'OpenAlex and Crossref do not provide an abstract for this work.'
+                          : paper.abstract,
+                      maxLines: widget.isPreview ? 4 : 8,
+                      overflow: TextOverflow.fade,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.5),
+                    ),
+                  ),
+                  if (!widget.isPreview) ...[
+                    const SizedBox(height: 10),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        onPressed: () => _openAbstractReader(context),
+                        icon: const Icon(Icons.open_in_full),
+                        label: Text(paper.abstract.isEmpty ? 'Details' : 'Read full abstract'),
+                      ),
+                    ),
+                  ],
+                  if (paper.doi?.isNotEmpty == true && !widget.isPreview)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: SelectableText('DOI: ${paper.doi}'),
+                    ),
+                ],
               ),
             ),
-            if (!widget.isPreview) ...[
-              const SizedBox(height: 10),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  onPressed: () => _openAbstractReader(context),
-                  icon: const Icon(Icons.open_in_full),
-                  label: Text(paper.abstract.isEmpty ? 'Details' : 'Read full abstract'),
-                ),
-              ),
-            ],
-            if (paper.doi?.isNotEmpty == true && !widget.isPreview)
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: SelectableText('DOI: ${paper.doi}'),
-              ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

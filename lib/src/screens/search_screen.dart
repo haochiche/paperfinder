@@ -82,7 +82,7 @@ class _SearchScreenState extends State<SearchScreen> {
       yearStart: int.tryParse(_yearStartController.text.trim()),
       yearEnd: int.tryParse(_yearEndController.text.trim()),
       journalFilters: _selectedSources,
-      pageSize: 20,
+      pageSize: 50,
     );
 
     await widget.controller.search(request);

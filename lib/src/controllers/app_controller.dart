@@ -26,7 +26,7 @@ class AppController extends ChangeNotifier {
   bool showResultsList = true;
   String? errorMessage;
 
-  SearchRequest lastSearch = const SearchRequest(keywords: '', pageSize: 20);
+  SearchRequest lastSearch = const SearchRequest(keywords: '', pageSize: 50);
   List<SearchRequest> searchHistory = const [];
   List<PaperSummary> discoveryQueue = const [];
   String? nextCursor;
@@ -44,6 +44,9 @@ class AppController extends ChangeNotifier {
     notifyListeners();
     try {
       savedPapers = await _localStore.loadSavedPapers();
+      skippedPaperIds
+        ..clear()
+        ..addAll(await _localStore.loadSkippedPaperIds());
       searchHistory = await _localStore.loadSearchHistory();
       lastSearch = await _localStore.loadLastSearch() ?? lastSearch;
       zoteroConfig = await _localStore.loadZoteroConfig() ?? zoteroConfig;
@@ -77,13 +80,15 @@ class AppController extends ChangeNotifier {
 
     isSearching = true;
     errorMessage = null;
-    skippedPaperIds.clear();
     notifyListeners();
 
     try {
       final response = await _openAlexRepository.searchWorks(request.copyWith(clearCursor: true));
-      final savedIds = savedPapers.map((record) => record.paper.openAlexId).toSet();
-      discoveryQueue = response.papers.where((paper) => !savedIds.contains(paper.openAlexId)).toList();
+      final excludedIds = {
+        ...savedPapers.map((record) => record.paper.openAlexId),
+        ...skippedPaperIds,
+      };
+      discoveryQueue = response.papers.where((paper) => !excludedIds.contains(paper.openAlexId)).toList();
       nextCursor = response.nextCursor;
       lastSearch = request.copyWith(clearCursor: true);
       await _localStore.saveLastSearch(lastSearch);
@@ -157,6 +162,7 @@ class AppController extends ChangeNotifier {
     }
     final paper = discoveryQueue.first;
     skippedPaperIds.add(paper.openAlexId);
+    await _localStore.saveSkippedPaperIds(skippedPaperIds);
     discoveryQueue = discoveryQueue.skip(1).toList();
     notifyListeners();
   }
@@ -204,6 +210,8 @@ class AppController extends ChangeNotifier {
 
     savedPapers = [record, ...savedPapers];
     await _localStore.saveSavedPapers(savedPapers);
+    skippedPaperIds.add(paper.openAlexId);
+    await _localStore.saveSkippedPaperIds(skippedPaperIds);
     if (removeFromQueue) {
       discoveryQueue = discoveryQueue.skip(1).toList();
       if (discoveryQueue.isEmpty) {

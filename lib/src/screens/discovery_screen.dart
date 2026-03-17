@@ -23,13 +23,13 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
 
   AppController get controller => widget.controller;
 
-  void _handleDragUpdate(DragUpdateDetails details) {
+  void _handleHorizontalDragUpdate(DragUpdateDetails details) {
     setState(() {
-      _dragOffset += details.delta;
+      _dragOffset += Offset(details.delta.dx, 0);
     });
   }
 
-  Future<void> _handleDragEnd(DragEndDetails details) async {
+  Future<void> _handleHorizontalDragEnd(DragEndDetails details) async {
     final width = MediaQuery.of(context).size.width;
     final threshold = width * 0.28;
 
@@ -81,6 +81,9 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                 : controller.showResultsList
                     ? _ResultsList(
                         papers: papers,
+                        hasMore: controller.nextCursor != null,
+                        isLoadingMore: controller.isSearching,
+                        onLoadMore: controller.loadMore,
                         onOpenPaper: (paperId) {
                           controller.openPaperDeck(paperId);
                           setState(() {
@@ -115,8 +118,8 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                           ),
                           Positioned.fill(
                             child: GestureDetector(
-                              onPanUpdate: _handleDragUpdate,
-                              onPanEnd: _handleDragEnd,
+                              onHorizontalDragUpdate: _handleHorizontalDragUpdate,
+                              onHorizontalDragEnd: _handleHorizontalDragEnd,
                               child: Transform.translate(
                                 offset: _dragOffset,
                                 child: Transform.rotate(
@@ -259,80 +262,110 @@ class _ResultsList extends StatelessWidget {
   const _ResultsList({
     required this.papers,
     required this.onOpenPaper,
+    required this.onLoadMore,
+    required this.hasMore,
+    required this.isLoadingMore,
   });
 
   final List<PaperSummary> papers;
   final ValueChanged<String> onOpenPaper;
+  final Future<void> Function() onLoadMore;
+  final bool hasMore;
+  final bool isLoadingMore;
 
   @override
   Widget build(BuildContext context) {
-    return ListView.separated(
-      itemCount: papers.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final paper = papers[index];
-        return Card(
-          child: InkWell(
-            borderRadius: BorderRadius.circular(28),
-            onTap: () => onOpenPaper(paper.openAlexId),
-            child: Padding(
-              padding: const EdgeInsets.all(18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    paper.title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    [
-                      if (paper.authors.isNotEmpty) paper.authors.take(3).join(', '),
-                      if (paper.journal != null) paper.journal!,
-                      if (paper.year != null) '${paper.year}',
-                    ].join(' • '),
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    paper.abstract.isEmpty
-                        ? 'Abstract unavailable from OpenAlex or Crossref for this paper.'
-                        : paper.abstract,
-                    maxLines: 4,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.4),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    paper.abstract.isEmpty
-                        ? 'No abstract source found'
-                        : 'Abstract source: ${paper.abstractSource}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        if (hasMore &&
+            !isLoadingMore &&
+            notification.metrics.pixels > notification.metrics.maxScrollExtent - 240) {
+          onLoadMore();
+        }
+        return false;
+      },
+      child: ListView.separated(
+        itemCount: papers.length + (hasMore ? 1 : 0),
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        itemBuilder: (context, index) {
+          if (index >= papers.length) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Center(
+                child: isLoadingMore
+                    ? const CircularProgressIndicator()
+                    : FilledButton.tonal(
+                        onPressed: onLoadMore,
+                        child: const Text('Load more papers'),
+                      ),
+              ),
+            );
+          }
+
+          final paper = papers[index];
+          return Card(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(28),
+              onTap: () => onOpenPaper(paper.openAlexId),
+              child: Padding(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      paper.title,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      [
+                        if (paper.authors.isNotEmpty) paper.authors.take(3).join(', '),
+                        if (paper.journal != null) paper.journal!,
+                        if (paper.year != null) '${paper.year}',
+                      ].join(' • '),
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      paper.abstract.isEmpty
+                          ? 'Abstract unavailable from OpenAlex or Crossref for this paper.'
+                          : paper.abstract,
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.4),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      paper.abstract.isEmpty
+                          ? 'No abstract source found'
+                          : 'Abstract source: ${paper.abstractSource}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        FilledButton.tonalIcon(
+                          onPressed: () => onOpenPaper(paper.openAlexId),
+                          icon: const Icon(Icons.swipe),
+                          label: const Text('Open cards'),
+                        ),
+                        const Spacer(),
+                        Icon(
+                          Icons.arrow_forward_ios,
+                          size: 16,
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
-                    children: [
-                      FilledButton.tonalIcon(
-                        onPressed: () => onOpenPaper(paper.openAlexId),
-                        icon: const Icon(Icons.swipe),
-                        label: const Text('Open cards'),
-                      ),
-                      const Spacer(),
-                      Icon(
-                        Icons.arrow_forward_ios,
-                        size: 16,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }
