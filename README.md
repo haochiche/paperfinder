@@ -22,4 +22,3 @@ To make the project runnable locally:
 4. Start the app with `flutter run`.
 
 The generated platform folders should coexist with the source tree in `lib/` and `test/`.
-
